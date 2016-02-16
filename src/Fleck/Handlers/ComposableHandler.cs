@@ -3,6 +3,57 @@ using System.Collections.Generic;
 
 namespace Fleck.Handlers
 {
+    public class ComposableHanderWithExtensions
+    {
+        public Func<string, string, byte[]> Handshake = (s,e) => new byte[0];
+        public Func<string, WebSocketExtension, byte[]> TextFrame = (x,e) => new byte[0];
+        public Func<byte[], WebSocketExtension, byte[]> BinaryFrame = (x,e) => new byte[0];
+        public Action<List<byte>, WebSocketExtension> ReceiveData = delegate { };
+        public Func<byte[], byte[]> PingFrame = i => new byte[0];
+        public Func<byte[], byte[]> PongFrame = i => new byte[0];
+        public Func<int, byte[]> CloseFrame = i => new byte[0];
+
+        private readonly List<byte> _data = new List<byte>();
+
+        public byte[] CreateHandshake(string subProtocol = null, string extension = null)
+        {
+            return Handshake(subProtocol, extension);
+        }
+
+        public void Receive(IEnumerable<byte> data, WebSocketExtension extension = null)
+        {
+            _data.AddRange(data);
+
+            ReceiveData(_data, extension);
+        }
+
+        public byte[] FrameText(string text, WebSocketExtension extension = null)
+        {
+            return TextFrame(text, extension);
+        }
+
+        public byte[] FrameBinary(byte[] bytes, WebSocketExtension extension = null)
+        {
+            return BinaryFrame(bytes, extension);
+        }
+
+        public byte[] FramePing(byte[] bytes)
+        {
+            return PingFrame(bytes);
+        }
+
+        public byte[] FramePong(byte[] bytes)
+        {
+            return PongFrame(bytes);
+        }
+
+        public byte[] FrameClose(int code)
+        {
+            return CloseFrame(code);
+        }
+    }
+
+
     public class ComposableHandler : IHandler
     {
         public Func<string, byte[]> Handshake = s => new byte[0];

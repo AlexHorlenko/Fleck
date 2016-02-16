@@ -43,6 +43,16 @@ namespace Fleck
               : new string[0];
           }
         }
+
+        public string[] Extensions {
+            get
+            {
+                string value;
+                return _headers.TryGetValue("Sec-WebSocket-Extensions", out value)
+                    ? value.Split(new []{',',}, StringSplitOptions.RemoveEmptyEntries)
+                    : new string[0];
+            }
+        }
     }
 }
 

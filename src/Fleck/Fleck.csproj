@@ -66,6 +66,8 @@
   </Choose>
   <ItemGroup>
     <Compile Include="ConnectionNotAvailableException.cs" />
+    <Compile Include="ExtensionNegotiationFailureException.cs" />
+    <Compile Include="ExtensionsNegotiator.cs" />
     <Compile Include="Handlers\ComposableHandler.cs" />
     <Compile Include="Handlers\Draft76Handler.cs" />
     <Compile Include="Handlers\FlashSocketPolicyRequestHandler.cs" />
@@ -120,7 +122,5 @@
   </Target>
   -->
   <ItemGroup />
-  <ItemGroup>
-    <Folder Include="Helpers\" />
-  </ItemGroup>
+  <ItemGroup />
 </Project>

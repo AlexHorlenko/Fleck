@@ -29,6 +29,7 @@ namespace Fleck.Samples.ConsoleApp
                             Console.WriteLine(message);
                             allSockets.ToList().ForEach(s => s.Send("Echo: " + message));
                         };
+                    
                 });
 
 

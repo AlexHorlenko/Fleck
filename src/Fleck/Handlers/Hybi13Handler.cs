@@ -7,6 +7,24 @@ using System.Text;
 
 namespace Fleck.Handlers
 {
+    public static class Hybi13HandlerWithExtension
+    {
+        public static ComposableHanderWithExtensions Create(WebSocketHttpRequest request, Action<string> onMessage, Action onClose, Action<byte[]> onBinary, Action<byte[]> onPing, Action<byte[]> onPong)
+        {
+            var readState = new ReadState();
+            return new ComposableHanderWithExtensions
+            {
+                Handshake = (sub, ext) => Hybi13Handler.BuildHandshake(request, sub, ext),
+                TextFrame = (s, ext) => Hybi13Handler.FrameData(Encoding.UTF8.GetBytes(s), FrameType.Text, ext),
+                BinaryFrame = (s, ext) => Hybi13Handler.FrameData(s, FrameType.Binary, ext),
+                PingFrame = s => Hybi13Handler.FrameData(s, FrameType.Ping),
+                PongFrame = s => Hybi13Handler.FrameData(s, FrameType.Pong),
+                CloseFrame = i => Hybi13Handler.FrameData(i.ToBigEndianBytes<ushort>(), FrameType.Close),
+                ReceiveData = (d, ext) => Hybi13Handler.ReceiveData(d, readState, (op, data) => Hybi13Handler.ProcessFrame(op, data, onMessage, onClose, onBinary, onPing, onPong, ext))
+            };
+        }
+    }
+
     public static class Hybi13Handler
     {
         public static IHandler Create(WebSocketHttpRequest request, Action<string> onMessage, Action onClose, Action<byte[]> onBinary, Action<byte[]> onPing, Action<byte[]> onPong)
@@ -24,11 +42,17 @@ namespace Fleck.Handlers
             };
         }
         
-        public static byte[] FrameData(byte[] payload, FrameType frameType)
+        public static byte[] FrameData(byte[] payload, FrameType frameType, WebSocketExtension extension = null)
         {
             var memoryStream = new MemoryStream();
             byte op = (byte)((byte)frameType + 128);
-            
+
+            if (extension != null)
+            {
+                op += extension.RSVByte;
+                payload = extension.OnSend(payload);
+            }
+
             memoryStream.WriteByte(op);
             
             if (payload.Length > UInt16.MaxValue) {
@@ -62,7 +86,7 @@ namespace Fleck.Handlers
                 
                 if (!isMasked
                     || !Enum.IsDefined(typeof(FrameType), frameType)
-                    || reservedBits != 0 //Must be zero per spec 5.2
+                    //|| reservedBits != 0 //Must be zero per spec 5.2
                     || (frameType == FrameType.Continuation && !readState.FrameType.HasValue))
                     throw new WebSocketException(WebSocketStatusCodes.ProtocolError);
                 
@@ -122,7 +146,7 @@ namespace Fleck.Handlers
             }
         }
         
-        public static void ProcessFrame(FrameType frameType, byte[] data, Action<string> onMessage, Action onClose, Action<byte[]> onBinary, Action<byte[]> onPing, Action<byte[]> onPong)
+        public static void ProcessFrame(FrameType frameType, byte[] data, Action<string> onMessage, Action onClose, Action<byte[]> onBinary, Action<byte[]> onPing, Action<byte[]> onPong, WebSocketExtension extension = null)
         {
             switch (frameType)
             {
@@ -143,7 +167,7 @@ namespace Fleck.Handlers
                 onClose();
                 break;
             case FrameType.Binary:
-                onBinary(data);
+                onBinary(extension == null ? data : extension.OnRecieve(data));
                 break;
             case FrameType.Ping:
                 onPing(data);
@@ -152,7 +176,7 @@ namespace Fleck.Handlers
                 onPong(data);
                 break;
             case FrameType.Text:
-                onMessage(ReadUTF8PayloadData(data));
+                onMessage(ReadUTF8PayloadData(extension == null ? data : extension.OnRecieve(data)));
                 break;
             default:
                 FleckLog.Debug("Received unhandled " + frameType);
@@ -161,9 +185,9 @@ namespace Fleck.Handlers
         }
         
         
-        public static byte[] BuildHandshake(WebSocketHttpRequest request, string subProtocol)
+        public static byte[] BuildHandshake(WebSocketHttpRequest request, string subProtocol, string extension = null)
         {
-            FleckLog.Debug("Building Hybi-14 Response");
+            FleckLog.Debug("Building Hybi-13 Response");
             
             var builder = new StringBuilder();
 
@@ -172,6 +196,8 @@ namespace Fleck.Handlers
             builder.Append("Connection: Upgrade\r\n");
             if (subProtocol != null)
               builder.AppendFormat("Sec-WebSocket-Protocol: {0}\r\n", subProtocol);
+            if (extension != null)
+                builder.AppendFormat("Sec-WebSocket-Extensions: {0}\r\n", extension);
 
             var responseKey =  CreateResponseKey(request["Sec-WebSocket-Key"]);
             builder.AppendFormat("Sec-WebSocket-Accept: {0}\r\n", responseKey);

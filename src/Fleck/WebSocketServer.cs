@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Collections.Generic;
 using System.Security.Authentication;
@@ -8,6 +9,36 @@ using Fleck.Helpers;
 
 namespace Fleck
 {
+    public class WebSocketExtension
+    {
+        public string Name { get; set; }
+        public Func<byte[], byte[]> OnSend { get; set; }
+        public Func<byte[], byte[]> OnRecieve { get; set; }
+        public byte RSVByte { get; set; }
+        /// <summary>
+        /// bool element in tuple points to mandatory server attribute
+        /// </summary>
+        public List<Tuple<WebSocketExtensionAttribute, bool>> SupportedAttributes { get; set; }
+
+        public WebSocketExtension()
+        {
+            SupportedAttributes = new List<Tuple<WebSocketExtensionAttribute, bool>>();
+        }
+
+        public string GetWebSocketExtensionRepresentation()
+        {
+            string seed = string.Empty;
+            string attributes = SupportedAttributes.Where(x => x.Item2 == true).Aggregate<Tuple<WebSocketExtensionAttribute, bool>, string>(seed, (x, y) => x + "; " + y.Item1.Name);
+            return Name + attributes;
+        }
+    }
+
+    public class WebSocketExtensionAttribute
+    {
+        public string Name { get; set; }
+        public string Value { get; set; }
+    }
+
     public class WebSocketServer : IWebSocketServer
     {
         private readonly string _scheme;
@@ -35,6 +66,7 @@ namespace Fleck
             }
             ListenerSocket = new SocketWrapper(socket);
             SupportedSubProtocols = new string[0];
+            SupportedExtensions = new WebSocketExtension[0];
         }
 
         public ISocket ListenerSocket { get; set; }
@@ -43,6 +75,7 @@ namespace Fleck
         public X509Certificate2 Certificate { get; set; }
         public SslProtocols EnabledSslProtocols { get; set; }
         public IEnumerable<string> SupportedSubProtocols { get; set; }
+        public IEnumerable<WebSocketExtension> SupportedExtensions { get; set; }
 
         public bool IsSecure
         {
@@ -119,7 +152,8 @@ namespace Fleck
                                                  b => connection.OnBinary(b),
                                                  b => connection.OnPing(b),
                                                  b => connection.OnPong(b)),
-                s => SubProtocolNegotiator.Negotiate(SupportedSubProtocols, s));
+                s => SubProtocolNegotiator.Negotiate(SupportedSubProtocols, s),
+                s => ExtensionsNegotiator.Negotiate(SupportedExtensions, s));
 
             if (IsSecure)
             {

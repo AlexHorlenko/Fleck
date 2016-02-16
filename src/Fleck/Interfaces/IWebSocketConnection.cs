@@ -16,6 +16,7 @@ namespace Fleck
         Task Send(byte[] message);
         Task SendPing(byte[] message);
         Task SendPong(byte[] message);
+        WebSocketExtension Extension { get; set; }
         void Close();
         IWebSocketConnectionInfo ConnectionInfo { get; }
         bool IsAvailable { get; }

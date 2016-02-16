@@ -12,6 +12,8 @@ test-results
 *.pidb
 TestResult.xml
 artifacts
+src/TestResults
+src/packages
 src/CommonAssemblyInfo.cs
 *.dotCover
 *mm_cache.bin
